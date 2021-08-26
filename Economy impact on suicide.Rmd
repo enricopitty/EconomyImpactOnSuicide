@@ -1,0 +1,670 @@
+---
+title: "L'impatto dell'economia sul fenomeno del suicidio"
+author: "Enrico Pittalis"
+date: "02/09/2021"
+output:
+  ioslides_presentation:
+    css: style.css
+    incremental: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, out.width = "100%",
+                      out.height = "100%"
+                      )
+```
+
+```{r libraries, echo=FALSE, include=FALSE}
+library(dplyr)
+library(readr)
+library(tidyr)
+library(ggplot2)
+library(plotly)
+library(reshape2)
+library(ggpubr)
+library(yaml)
+```
+
+
+# Introduzione: una panoramica sul fenomeno del suicidio
+
+
+## Cause di morte nel mondo
+
+Ogni anno nel mondo muoiono quasi **60 milioni** di persone.
+
+Il **suicidio** fa parte delle principali cause di morte, con circa **800 mila persone** ogni anno (1 persona ogni 40 secondi). 
+
+```{r death-causes}
+
+# Leggo il csv contenente tutte le cause di morte
+death_causes <- read_csv("Annual_number_of_deaths_by_cause.csv")
+
+# Vettore contenente i nomi di tutte le colonne del dataset
+cn_deathcauses <- c("Country", "Code", "Year", "Executions", "Meningitis",
+                    "Lower respiratory infections",
+                   "Intestinal infectious diseases", "Protein-energy malnutrition", "Terrorism",
+                   "Cardiovascular diseases", "Alzheimer disease and other dementias",
+                   "Chronic kidney disease", "Chronic respiratory diseases",
+                   "Cirrhosis and other chronic liver diseases", "Digestive diseases", "Hepatitis",
+                   "Neoplasms","Parkinson disease", "Fire, heat, and hot substances",
+                   "Malaria", "Drowning", "Interpersonal violence", "HIV/AIDS", "Drug use disorders",
+                   "Tuberculosis", "Road injuries", "Maternal disorders", "Neonatal disorders",
+                   "Alcohol use disorders", "Exposure to forces of nature", "Diarrheal diseases",
+                   "Environmental heat and cold exposure", "Nutritional deficiencies", "Suicide",
+                   "Conflict and terrorism", "Diabetes mellitus", "Poisonings")
+
+# Cambio i nomi delle colonne del dataset
+colnames(death_causes) <- cn_deathcauses
+
+# Tidy: filtro i dati lasciando solo quelli necessari e li modifico per prepararli a essere plottati
+dn_cause <- death_causes %>%
+      filter(Year == 2017) %>%
+      select(Executions:Poisonings) %>%
+      round
+
+# Strutturo i dati in modo da poterli plottare
+dn <- data.frame(
+    Number = colSums(dn_cause, na.rm = TRUE)) %>%
+    arrange(desc(Number)) %>%
+    filter(Number>0)
+
+# Creo una paletta di colori personalizzata per evidenziare solo la barra del grafico di interesse
+dn_palette<- c("#5DADE2", "#5DADE2", "#5DADE2","#5DADE2","#5DADE2","#5DADE2",
+               "#5DADE2","#5DADE2","#5DADE2","#5DADE2","#5DADE2","#5DADE2","#5DADE2",
+               "#5DADE2", "#FF0000","#5DADE2","#5DADE2","#5DADE2","#5DADE2","#5DADE2",
+               "#5DADE2","#5DADE2","#5DADE2","#5DADE2","#5DADE2","#5DADE2","#5DADE2","#5DADE2",
+               "#5DADE2","#5DADE2","#5DADE2","#5DADE2")
+
+# Costruisco il grafico e ne modifico l'aspetto
+dn_plot <- dn %>%
+    ggplot(aes(reorder(row.names(dn), Number), Number)) +
+    geom_bar(stat = "Identity", fill = dn_palette) +
+    coord_flip() +
+    scale_y_continuous(breaks = c(1000000, 5000000, 10000000, 15000000),
+                       labels = c("1mln", "5mln", "10mln", "15mln")) +
+    theme(axis.text.x = element_text(face = "bold"),
+          axis.text.y = element_text(face = "bold"),
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank())
+
+## Output: barplot orizzontale
+dn_plot
+  
+```
+
+## Il suicidio negli anni
+
+Fortunatamente, il fenomeno del suicidio è in **costante calo**.
+Analizzando i tassi di suicidio (numero di suicidi / 100k persone):
+
+* Nel **2000**, il tasso era di **11.57** 
+* Nel **2017**, il tasso è sceso a **9.67 **
+
+```{r suicide-rates}
+
+# Leggo il csv contenente tutti i tassi di suicidio 
+suicide_rates <- read_csv("Suicide_mortality_rate.csv")
+
+# Filtro i dati e li raccolgo in una struttura dati plottabile
+sr <- data.frame(Year =  c(2000:2017), Rate = suicide_rates %>%
+  select("2000":"2017") %>%
+  colMeans(na.rm = TRUE) %>%
+  round(digits = 2) )
+
+# Creo il grafico (statico)
+sr_plot <- sr %>%
+  ggplot(aes(x=Year, y=Rate)) +
+  geom_line(size = 1.5, color = "black") +
+  geom_point(size = 4, color = "orange") +
+  theme_minimal() +
+  scale_x_continuous(breaks = c(2000:2017)) +
+  theme(axis.text.x = element_text(face = "bold"),
+        axis.text.y = element_text(face = "bold")) +
+  ylab("Suicide Rate")
+
+# Creo il grafico interattivo
+sr_plot_int <-  sr_plot %>%
+  ggplotly() %>%
+  config(displayModeBar = F)
+
+# Output: interactive connected scatterplot
+sr_plot_int 
+
+```
+
+<br/>
+Questo calo è stato favorito principalmente da:
+
+* Aumento della **sensibilità** riguardo al suicidio
+* Attività di **prevenzione**
+* Miglioramento delle **condizioni di vita/economiche**
+
+## Classificazione per sesso
+
+Il tasso di suicidio tra gli **uomini** è **3 volte maggiore** rispetto a quello delle **donne**.
+
+```{r suicide-rates-sex}
+
+# Leggo i csv contenenti i tassi di suicidio maschili e femminili
+sr_male <- read_csv("Suicide_mortality_rate_male.csv")
+sr_female <- read_csv("Suicide_mortality_rate_female.csv")
+
+# Riorganizzo i dati raccogliendo le medie di tutti gli anni
+sr_sex <- data.frame( Male = sr_male %>%
+                        select("2000":"2017") %>%
+                        colMeans(na.rm = TRUE) %>%
+                        round(digits = 2),
+                     
+                      Female = sr_female %>%
+                        select("2000":"2017") %>%
+                        colMeans(na.rm = TRUE) %>%
+                        round(digits = 2))
+
+# Raggruppo i dati in base al sesso, calcolando una media unica 
+sr_sex_reshaped <- sr_sex %>%
+  melt() %>%
+  group_by(variable) %>%
+  select(value) %>%
+  summarise(value = mean(value))
+
+# Cambio i nomi delle colonne  
+colnames(sr_sex_reshaped) <- c("Sex", "Rate")
+
+# Approssimo i risultati
+sr_sex_reshaped$Rate <- round(sr_sex_reshaped$Rate, digits = 1)
+
+# Creo il grafico
+sr_sex_plot <- sr_sex_reshaped %>%
+    ggplot(aes(Sex, Rate, fill = Sex, label = Rate)) +
+    geom_bar(stat = "Identity") + 
+    geom_text(size = 3, position = position_stack(vjust = 0.5)) + 
+    theme(axis.text.x = element_text(face = "bold"),
+          axis.text.y = element_text(face = "bold"),
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank()) 
+
+# Output: barplot
+sr_sex_plot
+
+```
+
+## Classificazione per età
+
+Il **suicidio** è una delle principali cause di morte tra i **giovani**. 
+
+Nonostante ciò, il suicidio è **più diffuso** tra le persone più vecchie **(70+ anni)**.
+
+```{r suicide-rates-age}
+
+# Leggo il csv contenente i tassi di suicidio per età
+sr_age <- read.csv("Suicide_rates_by_age.csv")
+
+# Cambio il nome delle colonne
+colnames(sr_age) <- c("Zone", "Year", "70+ years", "50-69 years", "5-14 years", "15-49 years")
+
+# Ordino le colonne per fascia di età
+sr_age <- sr_age[c("Zone", "Year", "5-14 years", "15-49 years", "50-69 years", "70+ years")]
+
+# Raggruppo i dati in base all'età, calcolando una media unica
+sr_age_reshaped <- sr_age %>%
+  select("5-14 years":"70+ years") %>%
+  melt() %>%
+  group_by(variable) %>%
+  select(value) %>%
+  summarise(value = mean(value))
+ 
+# Cambio i nomi delle colonne  
+colnames(sr_age_reshaped) <- c("Age", "Rate")
+
+# Approssimo i risultati
+sr_age_reshaped$Rate <- round(sr_age_reshaped$Rate, digits = 1)
+
+# Creo il grafico
+sr_age_plot <- sr_age_reshaped %>%
+    ggplot(aes(Age, Rate, fill = Age, label = Rate)) +
+    geom_bar(stat = "Identity") + 
+    coord_flip() +
+    geom_text(size = 3, position = position_stack(vjust = 0.5)) + 
+    theme(axis.text.x = element_text(face = "bold"),
+          axis.text.y = element_text(face = "bold"),
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank()) 
+
+# Output: barplot orizzontale
+sr_age_plot
+
+```
+
+Tra i **più giovani**, le cause principali sono:
+
+* Disturbi mentali (depressione, bipolarità...)
+* Traumi infantili
+* Bullismo, stalking
+
+Tra i **più vecchi** invece:
+
+* Problemi economici (disoccupazione, bancarotta)
+* Uso di droghe/alcol
+* Possesso di armi da fuoco
+
+## Paesi con più suicidi
+
+I **20** paesi con **più suicidi** al mondo appartengono a:
+
+* 35% Europa
+* 30% Africa
+* 25% Asia
+* 10% Oceania
+
+```{r suicide-rates-country}
+
+# Leggo il csv contenente tutti i tassi di suicidio 
+sr_country <- read_csv("Suicide_mortality_rate.csv")
+
+# Cambio i nomi delle colonne
+colnames(sr_country) <- c("Country", "Code", "2000":"2017")
+
+# Raggruppo i dati in base allo stato, calcolando una media unica e mantenendo solo la top10
+sr_country_reshaped <- sr_country %>%
+  select(Country, "2000":"2017") %>%
+  melt() %>%
+  group_by(Country) %>%
+  select(value) %>%
+  summarise(value = mean(value)) %>%
+  top_n(20) %>%
+  arrange(desc(value))
+
+# Cambio i nomi delle colonne
+colnames(sr_country_reshaped) <- c("Country", "Rate")
+
+# Approssimo i risultati
+sr_country_reshaped$Rate <- round(sr_country_reshaped$Rate, digits = 1)
+
+# Creo il grafico
+sr_country_plot <- sr_country_reshaped %>%
+    ggplot(aes(reorder(Country, Rate), Rate, fill = Country, label = Rate)) +
+    geom_bar(stat = "Identity") + 
+    coord_flip() +
+    geom_text(size = 3, position = position_stack(vjust = 0.5)) + 
+    theme(axis.text.x = element_text(face = "bold"),
+          axis.text.y = element_text(face = "bold"),
+          axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          legend.title = element_blank(),
+          legend.position = "none") 
+
+# Output: barplot orizzontale
+sr_country_plot
+
+```
+In questa classifica, 11 paesi su 20 sono considerati **poveri** o **in via di sviluppo**.
+
+# L'influenza della crisi economica
+
+## La grande recessione
+
+<div style="text-align:center"><img width ="800" height="350"  src="recession.jpg"/></div>
+
+<br/>
+Nel 2006, in America, scoppiò una grande **crisi economica** che colpì tutto il mondo dal **2007 al 2013**.
+
+Questa crisi fu innescata da una grave crisi del **mercato immobiliare** americano che poi, spinta da vari meccanismi di contagio, ha irradiato una **recessione** in tutto il mondo.
+
+Viene considerata una delle **peggiori** crisi economiche della **storia**.
+
+## Crisi vs Suicidi
+
+Per analizzare l'impatto della crisi sui suicidi sono stati scelti **8 paesi**, di cui **4 ricchi** e **4 poveri**.
+
+I paesi **ricchi** (appartenenti tutti al **G7**) sono:
+
+* Stati Uniti
+* Italia
+* Germania
+* Regno unito
+
+I paesi **poveri** sono:
+
+* Albania
+* Ucraina
+* India
+* Nigeria
+
+## Crisi vs Suicidi - Ricchi
+
+Analizzando l'andamento dei suicidi dal 2007 al 2013 in 4 paesi ricchi (appartenenti anche al G7), notiamo un **innalzamento** in tutti quanti.
+
+```{r crisis-suicides-rich}
+
+# Riorganizzo i dati sui tassi di suicidio
+suicide_rates_reshaped <- suicide_rates %>%
+  select("Country Name", "2000":"2017") %>%
+  melt() 
+
+# Cambio i nomi delle colonne
+colnames(suicide_rates_reshaped) <- c("Country", "Year", "Rate")
+
+# Rendo la colonna degli anni numerica
+suicide_rates_reshaped$Year <- as.numeric(levels(suicide_rates_reshaped$Year))[suicide_rates_reshaped$Year]
+
+# Grafico suicidi Germania 2007-2013
+germany_sr <- suicide_rates_reshaped %>%
+  filter(Country == "Germany", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Year, y=Rate)) +
+  scale_x_continuous(breaks = c(2007:2013)) +
+  geom_line(size = 1.5, color = "yellow", linetype = 2) +
+  theme_minimal() +
+  ggtitle("Germany") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()) 
+
+# Grafico suicidi Stati Uniti 2007-2013
+usa_sr <- suicide_rates_reshaped %>%
+  filter(Country == "United States", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Year, y=Rate)) +
+  scale_x_continuous(breaks = c(2007:2013)) +
+  geom_line(size = 1.5, color = "red", linetype = 2) +
+  theme_minimal() + 
+  ggtitle("United States") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()) 
+
+# Grafico suicidi Italia 2007-2013
+italy_sr <- suicide_rates_reshaped %>%
+  filter(Country == "Italy", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Year, y=Rate)) +
+  scale_x_continuous(breaks = c(2007:2013)) +
+  geom_line(size = 1.5, color = "green", linetype = 2) +
+  theme_minimal() + 
+  ggtitle("Italy") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()) 
+
+# Grafico suicidi Regno Unito 2007-2013
+uk_sr <- suicide_rates_reshaped %>%
+  filter(Country == "United Kingdom", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Year, y=Rate)) +
+  scale_x_continuous(breaks = c(2007:2013)) +
+  geom_line(size = 1.5, color = "blue", linetype = 2) +
+  theme_minimal() + 
+  ggtitle("United Kingdom") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()) 
+
+# Output: lineplot in griglia 4x4
+ggarrange(usa_sr, italy_sr, germany_sr, uk_sr, ncol = 2, nrow = 2)
+
+```
+
+## Crisi vs Suicidi - Poveri
+
+Invece, analizzando 4 paesi considerati poveri, il tasso di suicidi tra la popolazione sembra **non risentire** minimamente della crisi.
+
+```{r crisis-suicides-poor}
+
+# Grafico suicidi Albania 2007-2013
+albania_sr <- suicide_rates_reshaped %>%
+  filter(Country == "Albania", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Year, y=Rate)) +
+  scale_x_continuous(breaks = c(2007:2013)) +
+  geom_line(size = 1.5, color = "red", linetype = 2) +
+  theme_minimal() +
+  ggtitle("Albania") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()) 
+
+# Grafico suicidi India 2007-2013
+india_sr <- suicide_rates_reshaped %>%
+  filter(Country == "India", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Year, y=Rate)) +
+  scale_x_continuous(breaks = c(2007:2013)) +
+  geom_line(size = 1.5, color = "tan1", linetype = 2) +
+  theme_minimal() + 
+  ggtitle("India") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()) 
+
+# Grafico suicidi Nigeria 2007-2013
+nigeria_sr <- suicide_rates_reshaped %>%
+  filter(Country == "Nigeria", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Year, y=Rate)) +
+  scale_x_continuous(breaks = c(2007:2013)) +
+  geom_line(size = 1.5, color = "darkgreen", linetype = 2) +
+  theme_minimal() + 
+  ggtitle("Nigeria") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()) 
+
+# Grafico suicidi Ucraina 2007-2013
+ukraine_sr <- suicide_rates_reshaped %>%
+  filter(Country == "Ukraine", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Year, y=Rate)) +
+  scale_x_continuous(breaks = c(2007:2013)) +
+  geom_line(size = 1.5, color = "blue", linetype = 2) +
+  theme_minimal() + 
+  ggtitle("Ukraine") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()) 
+
+# Output: lineplot in griglia 4x4
+ggarrange(albania_sr, ukraine_sr, india_sr, nigeria_sr, ncol = 2, nrow = 2)
+
+```
+
+# Disoccupazione e suicidio: due fenomeni correlati?
+
+## Disoccupazione vs Suicidi
+
+L'aumento della **disoccupazione** è stata una **conseguenza** diretta della crisi economica.
+
+Per ricercare una **correlazione** tra i suicidi e l'aumento della disoccupazione, daremo uno sguardo a **6 paesi** (3 ricchi e 3 poveri).
+
+<div style="text-align:center"><img width ="800" height="350"  src="unemployment.jpeg"/></div>
+
+<br/>
+I paesi **ricchi** sono:
+
+* Grecia
+* Paesi Bassi
+* Italia
+
+I paesi **poveri** sono:
+
+* Serbia
+* Bulgaria
+* Sudafrica
+
+## Disoccupazione vs Suicidi - Ricchi
+
+Il caso pù emblematico riguarda la **Grecia**. 
+
+Con un **aumento** del tasso di disoccupazione del **20%**, i suicidi sono **aumentati** di **2** unità.
+
+```{r unemployment-suicides-rich}
+
+# Leggo il csv contenente i tassi di disoccupazione
+unemployment <- read_csv("Unemployment.csv")
+
+# Seleziono i dati che mi interessano e li riorganizzo
+unemployment_reshaped <- unemployment %>%
+  select("Country Name", "2000":"2017") %>%
+  melt() 
+
+# Cambio i nomi delle colonne
+colnames(unemployment_reshaped) <- c("Country", "Year", "Unemployment")
+
+# Rendo la colonna degli anni numerica
+unemployment_reshaped$Year <- as.numeric(levels(unemployment_reshaped$Year))[unemployment_reshaped$Year]
+
+# Creo la colonna ""Code" per entrambe le tabelle di dati
+unemployment_reshaped$Code <- paste(unemployment_reshaped$`Country`, "-",  unemployment_reshaped$Year)
+
+suicide_rates_reshaped$Code <- paste(suicide_rates_reshaped$`Country`, "-", suicide_rates_reshaped$Year)
+
+# Unisco i dati che matchano con un left join
+sr_unemployment <- left_join(suicide_rates_reshaped, unemployment_reshaped, by = "Code")
+
+# Rimuovo le colonne che non mi interessano
+sr_unemployment$"Country.y" <- NULL
+sr_unemployment$Year.y <- NULL
+
+# Rinomino le colonne e le riordino
+colnames(sr_unemployment) <- c("Country", "Year", "Rate", "Code", "Unemployment")
+sr_unemployment <- sr_unemployment[c("Country", "Year", "Code", "Rate", "Unemployment")]
+
+# Grafico Disoccupazione/Suicidi Grecia 2007-2017
+greece_un <- sr_unemployment %>%
+  filter(Country == "Greece", between(Year, 2007,2017)) %>%
+  ggplot(aes(x=Unemployment, y = Rate)) +
+  geom_point() +
+  geom_smooth(method=lm , color="red", fill="#69b3a2", se=TRUE) +
+  ggtitle("Greece (2007-2017)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Unemployment rate (%)") +
+  ylab("Suicide rate")
+
+# Output: scatterplot  
+greece_un
+
+```
+
+Altri 2 casi emblematici sono i **Paesi Bassi** e l'**Italia**, con un **aumento** dei suicidi di rispettivamente **3** e **1** unità.
+
+```{r unemployment-suicide-rich-2}
+
+# Grafico Disoccupazione/Suicidi Italia 2007-2013 
+italy_un <- sr_unemployment %>%
+  filter(Country == "Italy", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Unemployment, y = Rate)) +
+  geom_point() +
+  geom_smooth(method=lm , color="red", fill="#69b3a2", se=TRUE) +
+  ggtitle("Italy (2007-2013)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Unemployment rate (%)") +
+  ylab("Suicide rate")
+
+# Grafico Disoccupazione/Suicidi Paesi Bassi 2007-2013
+netherlands_un <- sr_unemployment %>%
+  filter(Country == "Netherlands", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Unemployment, y = Rate)) +
+  geom_point() +
+  geom_smooth(method=lm , color="red", fill="#69b3a2", se=TRUE) +
+  ggtitle("Netherlands (2007-2013)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Unemployment rate (%)") +
+  ylab("Suicide rate")
+
+# Output: scatterplot in griglia 1x2
+ggarrange(netherlands_un, italy_un, ncol = 2, nrow = 1)
+
+```
+
+## Disoccupazione vs Suicidi - Poveri
+
+Nuovamente, nei paesi poveri non c'è **nessun aumento** dei suicidi.
+
+In particolare in **Serbia**, nonostante un **forte aumento** della disoccupazione (10%), il tasso di suicidi **non ne risente**.
+
+```{r unemployment-suicide-poor}
+
+# Grafico Disoccupazione/Suicidi Serbia 2007-2013
+serbia_un <- sr_unemployment %>%
+  filter(Country == "Serbia", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Unemployment, y = Rate)) +
+  geom_point() +
+  geom_smooth(method=lm , color="red", fill="#69b3a2", se=TRUE) +
+  ggtitle("Serbia (2007-2013)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Unemployment rate (%)") +
+  ylab("Suicide rate")
+
+# Output: scatterplot
+serbia_un
+
+```
+
+Anche in **Sudafrica** e in **Bulgaria**, con la disoccupazione in **aumento**, i suicidi restano in **calo**.
+
+```{r unemployment-suicide-poor-2}
+
+# Grafico Disoccupazione/Suicidi Sudafrica 2007-2013
+southafrica_un <- sr_unemployment %>%
+  filter(Country == "South Africa", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Unemployment, y = Rate)) +
+  geom_point() +
+  geom_smooth(method=lm , color="red", fill="#69b3a2", se=TRUE) +
+  ggtitle("South Africa (2007-2013)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Unemployment rate (%)") +
+  ylab("Suicide rate")
+
+# Grafico Disoccupazione/Suicidi Bulgaria 2007-2013
+bulgaria_un <- sr_unemployment %>%
+  filter(Country == "Bulgaria", between(Year, 2007,2013)) %>%
+  ggplot(aes(x=Unemployment, y = Rate)) +
+  geom_point() +
+  geom_smooth(method=lm , color="red", fill="#69b3a2", se=TRUE) +
+  ggtitle("Bulgaria (2007-2013)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Unemployment rate (%)") +
+  ylab("Suicide rate")
+
+# Output: scatterplot in griglia 1x2
+ggarrange(southafrica_un, bulgaria_un, ncol = 2, nrow = 1)
+
+```
+
+# Conclusioni
+
+## Risultati dell'analisi
+
+Dalle analisi effettuate risulta che:
+
+* Nei paesi **ricchi** il trend dei suicidi è risultato **in crescita**, nonostante a livello mondiale sia in **calo**
+* I paesi **poveri** sembrano rispettare il trend mondiale
+* Nei paesi ricchi, che di norma hanno una percentuale di disoccupazione **bassa**, un eventuale aumento della disoccupazione **impatta** sul tasso di suicidi
+* Nei paesi poveri invece, dove la disoccupazione è già abbastanza **elevata**, un eventuale aumento non causa **nessun effetto**.
+
+## Considerazioni finali
+
+*Nei paesi ricchi, dove si è abituati a vivere bene e ad avere tutto, le difficoltà mettono in ginocchio facilmente le persone.*
+
+*Nei paesi poveri, dove si è abituati a vivere in condizioni difficili, le persone hanno più speranza e forza di volontà nel continuare a rialzarsi.*
+
+<div style="text-align:center"><img width ="800" height="350"  src="richvspoor.jpg"/></div>
+
+# Grazie per l'attenzione!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
